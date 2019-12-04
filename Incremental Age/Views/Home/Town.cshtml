@@ -1,0 +1,175 @@
+﻿@model GameModel;
+@{
+    ViewData["Title"] = "Incremental Age";
+}
+
+<a href="/Home/AssignJob?Job=ChopTree">Chop Tree</a>
+
+<canvas border="1px solid black" background="red"></canvas>
+
+
+<script>
+    var canvas = document.querySelector('canvas');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    var c = canvas.getContext('2d');
+
+    var players = [];
+    @foreach (var Player in @Model.Players)
+    {
+        @:var player = new Player("@Player.Name", @Player.X, @Player.Y, @Player.DestinationX, @Player.DestinationY, @Player.moveSpeed, "@Player.Job", "@Player.Action");
+        @:players.push(player);
+    }
+
+    var trees = [];
+    @foreach (var Tree in @Model.Trees)
+    {
+        @:var tree = new Tree(@Tree.HP, @Tree.X, @Tree.Y, @Tree.Size);
+        @:trees.push(tree);
+    }
+
+
+    function getDistance(player, obj) {
+        var xDistance = playerX - obj.x;
+        var yDistance = playerY - obj.y;
+
+        return (Math.sqrt(Math.pow(xDistance, 2) + Math.pow(yDistance, 2))) - (playerRadius + obj.radius);
+    }
+
+    function Player(playerName, x, y, DestinationX, DestinationY, moveSpeed, Job, Action) {
+        this.playerName = playerName;
+        this.x = x;
+        this.y = y;
+        this.Job = Job;
+        this.Color = "Blue" //'rgba(' + Math.random() * 255 + ',' + Math.random() * 255 + ',' + Math.random() * 255 + ',100)'
+        this.Action = Action;
+        this.DestinationX = DestinationX;
+        this.DestinationY = DestinationY;
+        this.moveSpeed = moveSpeed;
+        var tick = 0;
+        var post = true;
+        var radius = 10;
+        var shortestPath = 99999999999;
+        var closestTree;
+
+        this.draw = function () {
+            c.beginPath();
+            c.arc(this.x, this.y, radius, 0, Math.PI * 2, false);
+            c.fillStyle = this.Color;
+            c.fill();
+            c.fillStyle = 'Black';
+            c.textAlign = "center";
+            c.fillText(this.playerName + ", Job: " + this.Job + ", Action: " + this.Action, this.x, this.y - 15);
+        }
+
+        this.onRoute = function () {
+
+            trees.forEach(function (tree) {
+                var distance = getDistance(/*PLAYER,*/ tree);
+                if (shortestPath > distance) {
+                    shortestPath = distance;
+                    closestTree = tree;
+                }                
+            })
+            DestinationX = closestTree.x;
+            DestinationY = closestTree.y;
+
+            if (this.y != this.DestinationY && this.x != this.DestinationX) {
+                if (tick == 10) {
+                    if (this.x < this.DestinationX) {
+                        this.x += this.moveSpeed;
+                    } else if (this.x > this.DestinationX) {
+                        this.x -= this.moveSpeed;
+                    }
+
+                    if (this.y < this.DestinationY) {
+                        this.y += this.moveSpeed;
+                    } else if (this.x > this.DestinationY) {
+                        this.y -= this.moveSpeed;
+                    }
+                    tick = 0;
+                    console.log("x: " + this.x + ", y: " + this.y);
+                } else {
+                    tick++;
+                }
+            } else if (this.y == this.DestinationY && this.x == this.DestinationX) {
+                this.ActionComplete();
+            }
+            this.draw();
+        }
+        this.Attack = function () {
+
+        }
+
+        this.ActionComplete = function () {
+            if (post) {
+                window.open("/Home/ActionComplete?playerName=" + this.playerName, "_top");
+                post = false;
+            }
+            this.draw();
+        }
+    }
+
+    function Tree(HP, x, y, radius) {
+        this.HP = HP;
+        this.x = x;
+        this.y = y;
+        this.radius = radius;
+        var tick = 0;
+
+        this.draw = function () {
+            c.beginPath();
+            c.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+            c.fillStyle = 'darkgreen';
+            c.fill();
+            c.strokeStyle = "black";
+            c.fillStyle = 'green';
+            c.fillRect(this.x - this.radius, this.y - this.radius - 15, this.radius * 2, 10);
+            c.strokeRect(this.x - this.radius, this.y - this.radius - 15, this.radius * 2, 10);
+            c.fillStyle = 'White';
+            c.textAlign = "center";
+            c.textBaseline = "middle";
+            c.fillText(this.HP, this.x, this.y - this.radius - 9);
+        }
+
+        this.dmg = function () {
+            if (tick == 10) {
+                if (this.HP > 0) {
+                    this.HP -= 1;
+                }
+            } else {
+                tick++;
+            }
+
+            this.draw();
+        }
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        c.clearRect(0, 0, innerWidth, innerHeight);
+
+        trees.forEach(function (tree) {
+            tree.draw()
+        });
+
+        players.forEach(function (player) {
+            switch (player.Action) {
+                case "onRoute":
+                    player.onRoute();
+                    break;
+
+                case "ChopTree":
+                    player.Attack();
+                    break;
+
+                default:
+                    player.draw();
+                    break;
+            }
+        });
+
+    }
+    animate();
+</script>
